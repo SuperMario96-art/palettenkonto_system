@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Neuer Partner</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background:#f5f7fb;
+      color:#222;
+    }
+    h2 {
+      margin-top:0;
+      color:#123b70;
+    }
+
+    a { text-decoration: none; color: #0044aa; }
+    a:hover { text-decoration: underline; }
+
+    label {
+      display:block;
+      margin-top:10px;
+      font-size:13px;
+      color:#333;
+    }
+
+    input[type=text] {
+      padding:6px 8px;
+      width:260px;
+      max-width:100%;
+      border-radius:4px;
+      border:1px solid #c5cde5;
+      box-sizing:border-box;
+      font-size:13px;
+    }
+
+    .btn {
+      display:inline-block;
+      padding:6px 12px;
+      border-radius:4px;
+      border:none;
+      cursor:pointer;
+      font-size:13px;
+      text-decoration:none;
+      font-weight:600;
+      margin-top:15px;
+    }
+
+    .btn-orange {
+      background:#ff9800;
+      color:#fff;
+    }
+    .btn-orange:hover {
+      background:#fb8c00;
+    }
+
+    .btn-secondary {
+      background:#ffffff;
+      color:#123b70;
+      border:1px solid #c5cde5;
+    }
+
+    .flash-messages {
+      margin:10px 0;
+      padding-left:18px;
+      font-size:13px;
+      color:#b30000;
+    }
+    .flash-messages li {
+      margin-bottom:2px;
+    }
+
+    .card {
+      background:#ffffff;
+      border:1px solid #d3ddf0;
+      border-radius:8px;
+      padding:15px;
+      max-width:380px;
+      box-shadow:0 2px 4px rgba(0,0,0,0.05);
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Neuer Partner</h2>
+  <a href="{{ url_for('index') }}">← Zurück zur Übersicht</a>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <ul class="flash-messages">
+        {% for category, msg in messages %}
+          <li>{{ msg }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  {% endwith %}
+
+  <div class="card">
+    <form method="post">
+      <label for="name">Partnername</label>
+      <input type="text" id="name" name="name" value="{{ name or '' }}" required>
+
+      <div>
+        <button type="submit" class="btn btn-orange">Speichern</button>
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">Abbrechen</a>
+      </div>
+    </form>
+  </div>
+
+</body>
+</html>

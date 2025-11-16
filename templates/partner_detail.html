@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Palettenkonto – {{ partner.name }}</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background:#f5f7fb;
+      color:#222;
+    }
+    h2 { margin-top: 0; color:#123b70; }
+
+    a { text-decoration: none; color: #0044aa; }
+    a:hover { text-decoration: underline; }
+
+    .toolbar {
+      margin-bottom: 8px;
+      display:flex;
+      justify-content: space-between;
+      align-items:center;
+    }
+
+    /* Инфо-панель под заголовком */
+    .info-bar {
+      background:#ffffff;
+      border:1px solid #d3ddf0;
+      border-radius:6px;
+      padding:6px 10px;
+      font-size:12px;
+      margin-bottom:10px;
+      display:flex;
+      flex-wrap:wrap;
+      gap:12px;
+      color:#333;
+      box-shadow:0 1px 2px rgba(0,0,0,0.03);
+    }
+    .info-label {
+      font-weight:bold;
+      color:#123b70;
+    }
+
+    .filter-panel {
+      background:#ffffff;
+      border:1px solid #d3ddf0;
+      border-radius:8px;
+      padding:12px 15px;
+      margin-bottom:10px;
+      box-shadow:0 2px 4px rgba(0,0,0,0.03);
+    }
+    .filter-row {
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      margin-bottom:8px;
+    }
+    .filter-row label {
+      font-size:13px;
+      color:#333;
+    }
+
+    input[type=date], select {
+      padding:4px 6px;
+      font-size:13px;
+      border-radius:4px;
+      border:1px solid #c5cde5;
+      box-sizing:border-box;
+    }
+
+    .btn {
+      display:inline-block;
+      padding:6px 12px;
+      border-radius:4px;
+      border:none;
+      cursor:pointer;
+      font-size:13px;
+      text-decoration:none;
+      font-weight:600;
+    }
+
+    .btn-orange { background:#ff9800; color:#fff; }
+    .btn-blue   { background:#123b70; color:#fff; }
+    .btn-red    { background:#d32f2f; color:#fff; }
+    .btn-light {
+      background:#fffaf2;
+      color:#444;
+      border:1px solid #f0e0c0;
+    }
+
+    .btn + .btn { margin-left:6px; }
+
+    /* Панель действий (Monatsabschluss, Buchung, Exporte) */
+    .actions-panel {
+      margin:10px 0;
+      padding:8px 10px;
+      background:#ffffff;
+      border:1px solid #d3ddf0;
+      border-radius:8px;
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      align-items:center;
+      box-shadow:0 2px 4px rgba(0,0,0,0.03);
+    }
+
+    /* Таблица + wrapper для скролла */
+    .table-wrapper {
+      margin-top:10px;
+      background:#ffffff;
+      border-radius:8px;
+      border:1px solid #d3ddf0;
+      box-shadow:0 2px 4px rgba(0,0,0,0.03);
+      max-height:70vh;
+      overflow-y:auto;
+      overflow-x:auto;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      min-width:900px;
+    }
+    th, td {
+      border: 1px solid #dde3f0;
+      padding: 6px 8px;
+      font-size:13px;
+      white-space:nowrap;
+    }
+    thead th {
+      background: #dbe5ff;
+      position:sticky;
+      top:0;
+      z-index:2;
+    }
+
+    tbody tr:nth-child(odd)  { background:#ffffff; }
+    tbody tr:nth-child(even) { background:#edf3ff; }
+    tbody tr:hover           { background:#d7e3ff; }
+
+    /* Saldo Anfang в одну строку над таблицей */
+    .saldo-line {
+      background:#ffffff;
+      border:1px solid #d3ddf0;
+      border-radius:6px;
+      padding:6px 10px;
+      font-size:13px;
+      margin:8px 0;
+      display:flex;
+      flex-wrap:wrap;
+      gap:12px;
+      align-items:center;
+      box-shadow:0 2px 4px rgba(0,0,0,0.03);
+    }
+    .saldo-label {
+      font-weight:bold;
+      margin-right:4px;
+      color:#123b70;
+    }
+
+    .val-pos  { color:#2e9143; font-weight:bold; }
+    .val-neg  { color:#d64545; font-weight:bold; }
+    .val-zero { color:#555; }
+
+    .blocked {
+      background:#ffe6e6;
+      border:1px solid #ff5c5c;
+      border-radius:6px;
+      padding:8px 10px;
+      margin:10px 0;
+      color:#b30000;
+      font-size:13px;
+    }
+
+    .flash-messages { margin:10px 0; }
+    .flash-messages li { font-size:13px; }
+
+    /* Бейджики для Richtung: только цвет текста */
+    .richtung-tag {
+      display:inline-block;
+      padding:2px 4px;
+      border-radius:2px;
+      font-size:11px;
+      font-weight:bold;
+    }
+    .richtung-eingang {
+      color:#2e7d32;
+    }
+    .richtung-ausgang {
+      color:#c62828;
+    }
+    .richtung-korrektur {
+      color:#123b70; /* темно-синий */
+    }
+
+    /* Цвет числовых значений по Richtung */
+    .num-eingang {
+      color:#2e7d32;
+      font-weight:bold;
+    }
+    .num-ausgang {
+      color:#c62828;
+      font-weight:bold;
+    }
+    .num-korrektur {
+      color:#123b70;  /* темно-синий */
+      font-weight:bold;
+    }
+
+    /* Sticky футер таблицы (итоги + Saldo Ende) */
+    tfoot {
+      position:sticky;
+      bottom:0;
+      z-index:1;
+    }
+    tfoot tr {
+      background:#e8ecff;
+      font-size:12px;
+    }
+    .totals-row td,
+    .saldo-end-row td {
+      border-top:1px solid #c5cde5;
+    }
+    .tfoot-label {
+      font-weight:bold;
+      color:#123b70;
+      text-align:right;
+    }
+
+    .pdf-icon {
+      margin-left:4px;
+      font-size:12px;
+      text-decoration:none;
+    }
+    .pdf-icon:hover {
+      text-decoration:underline;
+    }
+
+  </style>
+</head>
+<body>
+
+<div class="toolbar">
+  <div>
+    <h2>Palettenkonto – {{ partner.name }}</h2>
+    <a href="{{ url_for('index') }}">← Zurück zur Partnerübersicht</a>
+  </div>
+</div>
+
+<!-- Информация по текущему виду: Zeitraum, Richtung, Anzahl Buchungen -->
+<div class="info-bar">
+  <span><span class="info-label">Zeitraum:</span>
+    {{ start_date.strftime('%d.%m.%Y') }} – {{ end_date.strftime('%d.%m.%Y') }}
+  </span>
+  <span><span class="info-label">Richtung:</span>
+    {% if richtung_filter == 'ALLE' %}Alle{% else %}{{ richtung_filter }}{% endif %}
+  </span>
+  <span><span class="info-label">Buchungen:</span> {{ entries|length }}</span>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <ul class="flash-messages">
+      {% for category, msg in messages %}
+        <li>{{ msg }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
+
+<div class="filter-panel">
+  <form method="get" action="{{ url_for('partner_detail', partner_id=partner.id) }}">
+    <div class="filter-row">
+      <label>Jahr:</label>
+      <select name="year">
+        <option value="">–</option>
+        {% for y in years_list %}
+          <option value="{{ y }}" {% if selected_year == y %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+
+      <label>Monat:</label>
+      <select name="month">
+        <option value="">–</option>
+        <option value="1"  {% if selected_month == 1 %}selected{% endif %}>Januar</option>
+        <option value="2"  {% if selected_month == 2 %}selected{% endif %}>Februar</option>
+        <option value="3"  {% if selected_month == 3 %}selected{% endif %}>März</option>
+        <option value="4"  {% if selected_month == 4 %}selected{% endif %}>April</option>
+        <option value="5"  {% if selected_month == 5 %}selected{% endif %}>Mai</option>
+        <option value="6"  {% if selected_month == 6 %}selected{% endif %}>Juni</option>
+        <option value="7"  {% if selected_month == 7 %}selected{% endif %}>Juli</option>
+        <option value="8"  {% if selected_month == 8 %}selected{% endif %}>August</option>
+        <option value="9"  {% if selected_month == 9 %}selected{% endif %}>September</option>
+        <option value="10" {% if selected_month == 10 %}selected{% endif %}>Oktober</option>
+        <option value="11" {% if selected_month == 11 %}selected{% endif %}>November</option>
+        <option value="12" {% if selected_month == 12 %}selected{% endif %}>Dezember</option>
+      </select>
+
+      <label>Richtung:</label>
+      <select name="richtung">
+        <option value="ALLE"     {% if richtung_filter=='ALLE' %}selected{% endif %}>Alle</option>
+        <option value="Eingang"  {% if richtung_filter=='Eingang' %}selected{% endif %}>Eingang</option>
+        <option value="Ausgang"  {% if richtung_filter=='Ausgang' %}selected{% endif %}>Ausgang</option>
+        <option value="Korrektur" {% if richtung_filter=='Korrektur' %}selected{% endif %}>Korrektur</option>
+      </select>
+    </div>
+
+    <div class="filter-row">
+      <label>Zeitraum:</label>
+      <input type="date" name="start_date" value="{{ start_date.strftime('%Y-%m-%d') }}">
+      <span>bis</span>
+      <input type="date" name="end_date" value="{{ end_date.strftime('%Y-%m-%d') }}">
+
+      <button type="submit" class="btn btn-orange">Filtern</button>
+
+      <a class="btn btn-light"
+         href="{{ url_for('partner_detail',
+                          partner_id=partner.id,
+                          year=current_year,
+                          month=current_month,
+                          richtung=richtung_filter) }}">
+        Aktueller Monat
+      </a>
+
+      <a class="btn btn-light"
+         href="{{ url_for('partner_detail',
+                          partner_id=partner.id,
+                          year=prev_year,
+                          month=prev_month,
+                          richtung=richtung_filter) }}">
+        Vormonat
+      </a>
+
+      <a class="btn btn-light"
+         href="{{ url_for('partner_detail',
+                          partner_id=partner.id,
+                          year=current_year,
+                          richtung=richtung_filter) }}">
+        Aktuelles Jahr
+      </a>
+    </div>
+  </form>
+</div>
+
+<!-- Saldo Anfang в одну строку над таблицей -->
+<div class="saldo-line">
+  <span class="saldo-label">Saldo Anfang:</span>
+  <span>
+    EUP:
+    <span class="{% if start_saldo.eup > 0 %}val-pos{% elif start_saldo.eup < 0 %}val-neg{% else %}val-zero{% endif %}">
+      {{ start_saldo.eup }}
+    </span>
+  </span>
+  <span>
+    GB:
+    <span class="{% if start_saldo.gb > 0 %}val-pos{% elif start_saldo.gb < 0 %}val-neg{% else %}val-zero{% endif %}">
+      {{ start_saldo.gb }}
+    </span>
+  </span>
+  <span>
+    TMB1:
+    <span class="{% if start_saldo.tmb1 > 0 %}val-pos{% elif start_saldo.tmb1 < 0 %}val-neg{% else %}val-zero{% endif %}">
+      {{ start_saldo.tmb1 }}
+    </span>
+  </span>
+  <span>
+    TMB2:
+    <span class="{% if start_saldo.tmb2 > 0 %}val-pos{% elif start_saldo.tmb2 < 0 %}val-neg{% else %}val-zero{% endif %}">
+      {{ start_saldo.tmb2 }}
+    </span>
+  </span>
+</div>
+
+{% if selected_month_closed %}
+  <div class="blocked">
+    <b>Achtung:</b> Dieser Monat ist abgeschlossen. Neue Buchungen und Korrekturen in diesem Monat sind gesperrt.
+  </div>
+{% endif %}
+
+<!-- Панель действий -->
+<div class="actions-panel">
+  {% if not selected_month_closed %}
+    <a href="{{ url_for('new_entry', partner_id=partner.id) }}" class="btn btn-orange">Neue Buchung</a>
+
+    <a href="{{ url_for('correction_entry', partner_id=partner.id) }}" class="btn btn-blue">
+      Korrektur Buchung
+    </a>
+  {% endif %}
+
+  <a class="btn btn-orange"
+     href="{{ url_for('export_excel',
+                      partner_id=partner.id,
+                      start_date=start_date.strftime('%Y-%m-%d'),
+                      end_date=end_date.strftime('%Y-%m-%d'),
+                      richtung=richtung_filter) }}">
+    Export Excel
+  </a>
+
+  <a class="btn btn-orange"
+     href="{{ url_for('export_auszug_pdf',
+                      partner_id=partner.id,
+                      start_date=start_date.strftime('%Y-%m-%d'),
+                      end_date=end_date.strftime('%Y-%m-%d'),
+                      richtung=richtung_filter) }}">
+    Palettenkonto Auszug (PDF)
+  </a>
+
+  {% if can_close_month %}
+    <form method="post" action="{{ url_for('close_month', partner_id=partner.id) }}"
+          style="display:inline;">
+      <input type="hidden" name="year" value="{{ close_year }}">
+      <input type="hidden" name="month" value="{{ close_month }}">
+      <button type="submit"
+              class="btn btn-red"
+              title="Nach dem Monatsabschluss sind Buchungen und Korrekturen für vergangene Perioden nicht mehr möglich.">
+        Monatsabschluss
+      </button>
+    </form>
+  {% endif %}
+</div>
+
+<div class="table-wrapper">
+  <table>
+    <thead>
+      <tr>
+        <th>Datum</th>
+        <th>Belegnummer</th>
+        <th>Konto Nr</th>
+        <th>Richtung</th>
+        <th>EUP</th>
+        <th>GB</th>
+        <th>TMB1</th>
+        <th>TMB2</th>
+        <th>Kommentar</th>
+        <th>Erfasst von</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if entries %}
+        {% for e in entries %}
+          {% set num_class =
+              'num-eingang'   if e.richtung == 'Eingang'   else
+              'num-ausgang'   if e.richtung == 'Ausgang'   else
+              'num-korrektur' if e.richtung == 'Korrektur' else '' %}
+          <tr>
+            <td>{{ e.datum|dt }}</td>
+            <td>
+              {{ e.belegnummer }}
+              <a class="pdf-icon"
+                 href="{{ url_for('palettenschein', entry_id=e.id) }}"
+                 title="Palettenschein als PDF">
+                📄
+              </a>
+            </td>
+            <td>{{ e.konto_seq }}</td>
+            <td>
+              <span class="richtung-tag
+                {% if e.richtung == 'Eingang' %}richtung-eingang
+                {% elif e.richtung == 'Ausgang' %}richtung-ausgang
+                {% elif e.richtung == 'Korrektur' %}richtung-korrektur
+                {% endif %}
+              ">
+                {{ e.richtung }}
+              </span>
+            </td>
+            <td class="{{ num_class }}">{{ e.menge_eup }}</td>
+            <td class="{{ num_class }}">{{ e.menge_gb }}</td>
+            <td class="{{ num_class }}">{{ e.menge_tmb1 }}</td>
+            <td class="{{ num_class }}">{{ e.menge_tmb2 }}</td>
+            <td>{{ e.kommentar }}</td>
+            <td>{{ e.erfasst_von or 'Taach' }}</td>
+          </tr>
+        {% endfor %}
+      {% else %}
+        <tr><td colspan="10">Keine Buchungen im gewählten Zeitraum.</td></tr>
+      {% endif %}
+    </tbody>
+
+    <tfoot>
+      <tr class="totals-row">
+        <td colspan="4" class="tfoot-label">Summe im Zeitraum:</td>
+        <td>{{ totals.eup }}</td>
+        <td>{{ totals.gb }}</td>
+        <td>{{ totals.tmb1 }}</td>
+        <td>{{ totals.tmb2 }}</td>
+        <td colspan="2"></td>
+      </tr>
+      <tr class="saldo-end-row">
+        <td colspan="4" class="tfoot-label">Saldo Ende:</td>
+        <td>
+          <span class="{% if end_saldo.eup > 0 %}val-pos{% elif end_saldo.eup < 0 %}val-neg{% else %}val-zero{% endif %}">
+            {{ end_saldo.eup }}
+          </span>
+        </td>
+        <td>
+          <span class="{% if end_saldo.gb > 0 %}val-pos{% elif end_saldo.gb < 0 %}val-neg{% else %}val-zero{% endif %}">
+            {{ end_saldo.gb }}
+          </span>
+        </td>
+        <td>
+          <span class="{% if end_saldo.tmb1 > 0 %}val-pos{% elif end_saldo.tmb1 < 0 %}val-neg{% else %}val-zero{% endif %}">
+            {{ end_saldo.tmb1 }}
+          </span>
+        </td>
+        <td>
+          <span class="{% if end_saldo.tmb2 > 0 %}val-pos{% elif end_saldo.tmb2 < 0 %}val-neg{% else %}val-zero{% endif %}">
+            {{ end_saldo.tmb2 }}
+          </span>
+        </td>
+        <td colspan="2"></td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+
+</body>
+</html>

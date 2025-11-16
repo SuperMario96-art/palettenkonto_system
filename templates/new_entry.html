@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Neue Buchung – {{ partner.name }}</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding:20px;
+      background:#f5f7fb;
+      color:#222;
+    }
+    h2 { margin-top:0; color:#123b70; }
+
+    a { text-decoration:none; color:#0044aa; }
+    a:hover { text-decoration:underline; }
+
+    .form-card {
+      background:#ffffff;
+      border:1px solid #d3ddf0;
+      border-radius:8px;
+      padding:15px 18px;
+      max-width:520px;
+      box-shadow:0 2px 4px rgba(0,0,0,0.03);
+    }
+    .form-row {
+      margin-bottom:10px;
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    .form-row label {
+      width:130px;
+      font-size:13px;
+    }
+    input[type=text],
+    input[type=number],
+    input[type=date],
+    select,
+    textarea {
+      border:1px solid #c5cde5;
+      border-radius:4px;
+      padding:4px 6px;
+      font-size:13px;
+      flex:1;
+      box-sizing:border-box;
+    }
+    textarea {
+      resize:vertical;
+      min-height:60px;
+    }
+
+    .btn {
+      display:inline-block;
+      padding:6px 12px;
+      border-radius:4px;
+      border:none;
+      cursor:pointer;
+      font-size:13px;
+      font-weight:600;
+    }
+    .btn-orange { background:#ff9800; color:#fff; }
+    .btn-grey   { background:#e0e0e0; color:#333; }
+
+    .hint {
+      font-size:11px;
+      color:#666;
+      margin-top:2px;
+    }
+
+    .flash-messages { margin:10px 0; color:#b00020; font-size:13px; }
+  </style>
+</head>
+<body>
+
+<h2>Neue Buchung – {{ partner.name }}</h2>
+<p><a href="{{ url_for('partner_detail', partner_id=partner.id) }}">← Zurück zum Palettenkonto</a></p>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="flash-messages">
+      {% for category, msg in messages %}
+        <div>{{ msg }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<div class="form-card">
+  <form method="post" action="{{ url_for('new_entry', partner_id=partner.id) }}">
+    <div class="form-row">
+      <label>Richtung:</label>
+      <select name="richtung">
+        <option value="EIN" {% if form_state.richtung == 'EIN' %}selected{% endif %}>Eingang</option>
+        <option value="AUS" {% if form_state.richtung == 'AUS' %}selected{% endif %}>Ausgang</option>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <label>Datum:</label>
+      <input type="date" name="datum" value="{{ form_state.datum }}">
+    </div>
+
+    <div class="form-row">
+      <label>Lademittel:</label>
+      <select name="typ">
+        <option value="EUP"  {% if form_state.typ == 'EUP' %}selected{% endif %}>EUP</option>
+        <option value="GB"   {% if form_state.typ == 'GB' %}selected{% endif %}>GB</option>
+        <option value="TMB1" {% if form_state.typ == 'TMB1' %}selected{% endif %}>TMB1</option>
+        <option value="TMB2" {% if form_state.typ == 'TMB2' %}selected{% endif %}>TMB2</option>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <label>Menge:</label>
+      <input type="number" step="0.01" name="menge" value="{{ form_state.menge }}">
+    </div>
+
+    <div class="form-row">
+      <label>Kommentar:</label>
+      <textarea name="kommentar">{{ form_state.kommentar }}</textarea>
+    </div>
+    <div class="hint">
+      Bei <b>Ausgang</b> muss im Kommentar eine Nummer mit mindestens 4 Ziffern stehen
+      (z.&nbsp;B. Ladeliste <code>1234</code>). Das Wort „Ladeliste“ ist nicht mehr Pflicht.
+    </div>
+
+    <br>
+    <button type="submit" class="btn btn-orange">Buchung speichern</button>
+    <a href="{{ url_for('partner_detail', partner_id=partner.id) }}" class="btn btn-grey">Abbrechen</a>
+  </form>
+</div>
+
+</body>
+</html>
+

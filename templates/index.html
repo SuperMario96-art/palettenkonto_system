@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Palettenkonto – Partnerübersicht</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background:#f5f7fb;
+      color:#222;
+    }
+    h2 { 
+      margin:0 0 8px 0; 
+      color:#123b70; 
+    }
+
+    a { text-decoration: none; color: #0044aa; }
+    a:hover { text-decoration: underline; }
+
+    .top-bar {
+      display:flex;
+      justify-content: space-between;
+      align-items:center;
+      margin-bottom:10px;
+      flex-wrap:wrap;
+      gap:10px;
+    }
+
+    form.search {
+      display:flex;
+      gap:6px;
+      align-items:center;
+      margin:0;
+    }
+    input[type=text] {
+      padding:6px 8px;
+      width:260px;
+      max-width:100%;
+      border-radius:4px;
+      border:1px solid #c5cde5;
+      box-sizing:border-box;
+      font-size:13px;
+    }
+
+    .btn {
+      display:inline-block;
+      padding:6px 12px;
+      border-radius:4px;
+      border:none;
+      cursor:pointer;
+      font-size:13px;
+      text-decoration:none;
+      font-weight:600;
+    }
+    .btn-orange {
+      background:#ff9800;
+      color:#fff;
+    }
+    .btn-orange:hover { 
+      background:#fb8c00;
+    }
+
+    .btn-blue {
+      background:#123b70;
+      color:#fff;
+    }
+    .btn-blue:hover {
+      background:#0d2c52;
+    }
+
+    .btn-danger {
+      background:#d32f2f;
+      color:#fff;
+    }
+    .btn-danger:hover {
+      background:#b71c1c;
+    }
+
+    .btn-small {
+      padding:4px 8px;
+      font-size:11px;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 10px;
+      background:#ffffff;
+      border-radius:8px;
+      overflow:hidden;
+      box-shadow:0 2px 4px rgba(0,0,0,0.05);
+    }
+    th, td {
+      border: 1px solid #dde3f0;
+      padding: 6px 8px;
+      text-align: center;
+      font-size:13px;
+      white-space:nowrap;
+    }
+    th {
+      background: #dbe5ff;
+      color:#123b70;
+    }
+    tr:nth-child(even) { background: #f4f7ff; }
+    tr:nth-child(odd) { background: #ffffff; }
+    tr:hover { background:#e3ebff; }
+
+    td.partner-cell {
+      text-align:left;
+    }
+
+    .flash-messages {
+      margin:10px 0;
+      padding-left:18px;
+      font-size:13px;
+    }
+    .flash-messages li {
+      margin-bottom:2px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="top-bar">
+    <div>
+      <h2>Palettenkonto – Partnerübersicht</h2>
+      <form class="search" method="get" action="{{ url_for('index') }}">
+        <input type="text" name="q" value="{{ q or '' }}" placeholder="Partnername eingeben…">
+        <button type="submit" class="btn btn-blue">Suchen</button>
+      </form>
+    </div>
+
+    <div>
+      <a href="{{ url_for('new_partner') }}" class="btn btn-orange">Neuer Partner</a>
+    </div>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <ul class="flash-messages">
+        {% for category, msg in messages %}
+          <li>{{ msg }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  {% endwith %}
+
+  <table>
+    <thead>
+      <tr>
+        <th>Partner</th>
+        <th>EUP</th>
+        <th>GB</th>
+        <th>TMB1</th>
+        <th>TMB2</th>
+        <th>Aktion</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in partners %}
+        <tr>
+          <td class="partner-cell">
+            <a href="{{ url_for('partner_detail', partner_id=p.id) }}">
+              {{ p.name }}
+            </a>
+          </td>
+          <td>{{ p.saldo_eup }}</td>
+          <td>{{ p.saldo_gb }}</td>
+          <td>{{ p.saldo_tmb1 }}</td>
+          <td>{{ p.saldo_tmb2 }}</td>
+          <td>
+            <form method="post" action="{{ url_for('delete_partner', partner_id=p.id) }}" style="display:inline;"
+                  onsubmit="return confirm('Partner wirklich löschen? Alle Buchungen und Abschlüsse werden entfernt.');">
+              <button type="submit" class="btn btn-danger btn-small">Löschen</button>
+            </form>
+          </td>
+        </tr>
+      {% else %}
+        <tr>
+          <td colspan="6">Keine Partner gefunden.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+</body>
+</html>
+
