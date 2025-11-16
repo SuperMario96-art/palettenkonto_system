@@ -22,7 +22,7 @@
       align-items:center;
     }
 
-    /* Инфо-панель под заголовком */
+    /* Infoleiste unter der Überschrift */
     .info-bar {
       background:#ffffff;
       border:1px solid #d3ddf0;
@@ -91,7 +91,7 @@
 
     .btn + .btn { margin-left:6px; }
 
-    /* Панель действий (Monatsabschluss, Buchung, Exporte) */
+    /* Steuerleiste (Monatsabschluss, Buchung, Exporte) */
     .actions-panel {
       margin:10px 0;
       padding:8px 10px;
@@ -105,7 +105,7 @@
       box-shadow:0 2px 4px rgba(0,0,0,0.03);
     }
 
-    /* Таблица + wrapper для скролла */
+    /* Tabelle + Scroll-Wrapper */
     .table-wrapper {
       margin-top:10px;
       background:#ffffff;
@@ -138,7 +138,7 @@
     tbody tr:nth-child(even) { background:#edf3ff; }
     tbody tr:hover           { background:#d7e3ff; }
 
-    /* Saldo Anfang в одну строку над таблицей */
+    /* Saldo Anfang in einer Zeile oberhalb der Tabelle */
     .saldo-line {
       background:#ffffff;
       border:1px solid #d3ddf0;
@@ -175,7 +175,7 @@
     .flash-messages { margin:10px 0; }
     .flash-messages li { font-size:13px; }
 
-    /* Бейджики для Richtung: только цвет текста */
+    /* Badges für Richtung: nur Textfarbe */
     .richtung-tag {
       display:inline-block;
       padding:2px 4px;
@@ -190,10 +190,10 @@
       color:#c62828;
     }
     .richtung-korrektur {
-      color:#123b70; /* темно-синий */
+      color:#123b70; /* dunkelblau */
     }
 
-    /* Цвет числовых значений по Richtung */
+    /* Farbe der Zahlenwerte je nach Richtung */
     .num-eingang {
       color:#2e7d32;
       font-weight:bold;
@@ -203,11 +203,11 @@
       font-weight:bold;
     }
     .num-korrektur {
-      color:#123b70;  /* темно-синий */
+      color:#123b70;  /* dunkelblau */
       font-weight:bold;
     }
 
-    /* Sticky футер таблицы (итоги + Saldo Ende) */
+    /* Sticky Tabellenfuß (Summen + Saldo Ende) */
     tfoot {
       position:sticky;
       bottom:0;
@@ -247,7 +247,7 @@
   </div>
 </div>
 
-<!-- Информация по текущему виду: Zeitraum, Richtung, Anzahl Buchungen -->
+<!-- Information zur aktuellen Ansicht: Zeitraum, Richtung, Anzahl Buchungen -->
 <div class="info-bar">
   <span><span class="info-label">Zeitraum:</span>
     {{ start_date.strftime('%d.%m.%Y') }} – {{ end_date.strftime('%d.%m.%Y') }}
@@ -342,7 +342,7 @@
   </form>
 </div>
 
-<!-- Saldo Anfang в одну строку над таблицей -->
+<!-- Saldo Anfang in einer Zeile oberhalb der Tabelle -->
 <div class="saldo-line">
   <span class="saldo-label">Saldo Anfang:</span>
   <span>
@@ -377,7 +377,7 @@
   </div>
 {% endif %}
 
-<!-- Панель действий -->
+<!-- Steuerleiste -->
 <div class="actions-panel">
   {% if not selected_month_closed %}
     <a href="{{ url_for('new_entry', partner_id=partner.id) }}" class="btn btn-orange">Neue Buchung</a>

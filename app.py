@@ -19,7 +19,7 @@ app.config["SECRET_KEY"] = SECRET_KEY
 db = SQLAlchemy(app)
 
 
-# ---------- JINJA-ФИЛЬТР ДАТЫ-ВРЕМЕНИ ----------
+# ---------- JINJA-Filter für Datum/Zeit ----------
 
 @app.template_filter("dt")
 def format_datetime(value):
@@ -28,7 +28,7 @@ def format_datetime(value):
     return value.strftime("%d.%m.%Y %H:%M")
 
 
-# -------------------- МОДЕЛИ --------------------
+# -------------------- Modelle --------------------
 
 class Partner(db.Model):
     __tablename__ = "partner"
@@ -53,14 +53,13 @@ class Entry(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
     belegnummer = db.Column(db.String(20))
-    datum = db.Column(db.DateTime)          # дата и время движения
-    richtung = db.Column(db.String(20))     # 'Eingang' / 'Ausgang' / 'Korrektur' / (старое 'Storno')
+    datum = db.Column(db.DateTime)          # Buchungsdatum und -zeit
+    richtung = db.Column(db.String(20))     # 'Eingang' / 'Ausgang' / 'Korrektur'
 
     menge_eup = db.Column(db.Integer)
     menge_gb = db.Column(db.Integer)
     menge_tmb1 = db.Column(db.Integer)
     menge_tmb2 = db.Column(db.Integer)
-
 
     kommentar = db.Column(db.Text)
     konto_seq = db.Column(db.Integer, default=0)
@@ -73,8 +72,9 @@ class Entry(db.Model):
 
 class MonthClosure(db.Model):
     """
-    Monatsabschluss: жёсткая блокировка —
-    после закрытия месяца нельзя добавлять/менять/корректировать проводки в этом месяце.
+    Monatsabschluss: harte Sperre –
+    nach dem Monatsabschluss können im jeweiligen Monat
+    keine Buchungen hinzugefügt, geändert oder korrigiert werden.
     """
     __tablename__ = "month_closure"
 
@@ -95,10 +95,10 @@ class MonthClosure(db.Model):
     partner = db.relationship("Partner", back_populates="month_closures")
 
 
-# -------------------- ВСПОМОГАТЕЛЬНЫЕ --------------------
+# -------------------- Hilfsfunktionen --------------------
 
 def month_range(dt_date: date):
-    """Начало и конец месяца для заданной даты."""
+    """Monatsanfang und Monatsende für ein gegebenes Datum."""
     start = datetime(dt_date.year, dt_date.month, 1)
     if dt_date.month == 12:
         next_m = datetime(dt_date.year + 1, 1, 1)
@@ -109,6 +109,7 @@ def month_range(dt_date: date):
 
 
 def parse_date_or_none(s):
+    """Parst YYYY-MM-DD oder gibt None zurück."""
     if not s:
         return None
     try:
@@ -118,7 +119,7 @@ def parse_date_or_none(s):
 
 
 def get_last_closure_before(partner_id, dt: datetime):
-    """Последний Monatsabschluss до указанной даты."""
+    """Letzten Monatsabschluss vor dem angegebenen Datum ermitteln."""
     return (
         MonthClosure.query
         .filter_by(partner_id=partner_id)
@@ -129,7 +130,7 @@ def get_last_closure_before(partner_id, dt: datetime):
 
 
 def collect_partner_entries(partner: Partner):
-    """Все проводки по всем счетам партнёра."""
+    """Alle Buchungen über alle Konten eines Partners sammeln."""
     all_entries = []
     for acc in partner.accounts:
         all_entries.extend(acc.entries)
@@ -138,14 +139,14 @@ def collect_partner_entries(partner: Partner):
 
 def calculate_saldo_and_sums(partner_id, start_date: datetime, end_date: datetime):
     """
-    Возвращает:
-      entries         – записи в периоде
-      saldo_start     – сальдо на начало периода
-      movement        – движение за период
-      saldo_end       – сальдо на конец периода
-      sums_eingang    – суммы Eingang по видам тары
-      sums_ausgang    – суммы Ausgang по видам тары
-    С учётом последнего Monatsabschluss.
+    Berechnet:
+      entries         – Buchungen im Zeitraum
+      saldo_start     – Anfangssaldo
+      movement        – Bewegung im Zeitraum
+      saldo_end       – Endsaldo
+      sums_eingang    – Summen 'Eingang' nach Lademittel-Arten
+      sums_ausgang    – Summen 'Ausgang' nach Lademittel-Arten
+    unter Berücksichtigung des letzten Monatsabschlusses.
     """
     partner = Partner.query.get(partner_id)
     if not partner:
@@ -153,7 +154,7 @@ def calculate_saldo_and_sums(partner_id, start_date: datetime, end_date: datetim
 
     all_entries = collect_partner_entries(partner)
 
-    # база от последнего Abschluss
+    # Basiswert aus letztem Monatsabschluss
     last_closure = get_last_closure_before(partner_id, start_date)
     if last_closure:
         saldo_start = {
@@ -176,7 +177,7 @@ def calculate_saldo_and_sums(partner_id, start_date: datetime, end_date: datetim
         if not e.datum:
             continue
 
-        # всё до base_date уже учтено в последнем Abschluss
+        # alles bis base_date ist bereits im letzten Monatsabschluss enthalten
         if e.datum <= base_date:
             continue
 
@@ -184,8 +185,8 @@ def calculate_saldo_and_sums(partner_id, start_date: datetime, end_date: datetim
             mult = 1
         elif e.richtung == "Ausgang":
             mult = -1
-        elif e.richtung in ("Storno", "Korrektur"):
-            # корректирующие записи: знак задаёт сама Menge
+        elif e.richtung == "Korrektur":
+            # Korrekturen: Vorzeichen steckt in der Menge selbst
             mult = 1
         else:
             mult = 1
@@ -195,14 +196,14 @@ def calculate_saldo_and_sums(partner_id, start_date: datetime, end_date: datetim
         me_tmb1 = float(e.menge_tmb1 or 0)
         me_tmb2 = float(e.menge_tmb2 or 0)
 
-        # добираем до начала периода
+        # Aufholen vom Monatsabschluss bis zum Beginn des Zeitraums
         if base_date < e.datum < start_date:
             saldo_start["eup"] += me_eup * mult
             saldo_start["gb"] += me_gb * mult
             saldo_start["tmb1"] += me_tmb1 * mult
             saldo_start["tmb2"] += me_tmb2 * mult
 
-        # внутри периода
+        # innerhalb des betrachteten Zeitraums
         elif start_date <= e.datum <= end_date:
             entries_in_period.append(e)
 
@@ -221,9 +222,9 @@ def calculate_saldo_and_sums(partner_id, start_date: datetime, end_date: datetim
                 sums_ausgang["gb"] += me_gb
                 sums_ausgang["tmb1"] += me_tmb1
                 sums_ausgang["tmb2"] += me_tmb2
-            # Korrektur/Storno в sums_* не попадают, только в движение/сальдо
+            # Korrektur wird nur in Bewegung/Saldo berücksichtigt, nicht in sums_*
 
-    # новые сверху
+    # neueste Buchungen oben
     entries_in_period.sort(key=lambda x: x.datum or datetime.min, reverse=True)
 
     saldo_end = {
@@ -243,7 +244,7 @@ def calculate_saldo_and_sums(partner_id, start_date: datetime, end_date: datetim
     }
 
 
-# -------------------- ГЛАВНЫЙ ЭКРАН --------------------
+# -------------------- Hauptbildschirm --------------------
 
 @app.route("/")
 def index():
@@ -263,7 +264,7 @@ def index():
                     mult = 1
                 elif e.richtung == "Ausgang":
                     mult = -1
-                elif e.richtung in ("Storno", "Korrektur"):
+                elif e.richtung == "Korrektur":
                     mult = 1
                 else:
                     mult = 1
@@ -285,6 +286,7 @@ def index():
 
     return render_template("index.html", partners=data, q=q)
 
+
 # -------------------- PALLETTENKONTO --------------------
 
 @app.route("/partner/<int:partner_id>")
@@ -294,7 +296,7 @@ def partner_detail(partner_id):
     today = date.today()
     default_start, default_end = month_range(today)
 
-    # --------- DATUM + FILTER LOGIK ----------
+    # --------- Datum + Filterlogik ----------
     start_date_param = parse_date_or_none(request.args.get("start_date"))
     end_date_param   = parse_date_or_none(request.args.get("end_date"))
 
@@ -338,9 +340,6 @@ def partner_detail(partner_id):
 
     entries = result["entries"]
 
-    # Storno nicht anzeigen
-    entries = [e for e in entries if e.richtung != "Storno"]
-
     # Richtung-Filter
     if richtung_filter in ("Eingang", "Ausgang", "Korrektur"):
         entries = [e for e in entries if e.richtung == richtung_filter]
@@ -377,7 +376,7 @@ def partner_detail(partner_id):
 
     selected_month_closed = existing_closure is not None
 
-    # Schneller Zugriff: aktuelles Jahr/Monat + Vormonat
+    # Schneller Zugriff: Vormonat
     prev_ref = (ms - timedelta(days=1)).date()
     prev_month_start, prev_month_end = month_range(prev_ref)
 
@@ -412,10 +411,12 @@ def partner_detail(partner_id):
         selected_month_closed=selected_month_closed,
     )
 
+
 # -------------------- MONATSABSCHLUSS --------------------
 
 @app.route("/partner/<int:partner_id>/close_month", methods=["POST"])
 def close_month(partner_id):
+    """Führt den Monatsabschluss für einen Partner aus."""
     year = int(request.form.get("year"))
     month = int(request.form.get("month"))
 
@@ -431,7 +432,7 @@ def close_month(partner_id):
     period_ref = date(year, month, 1)
     period_start, period_end = month_range(period_ref)
 
-    # классический пересчёт до конца месяца
+    # Salden bis einschließlich Monatsende berechnen
     result = calculate_saldo_and_sums(partner_id, datetime.min, period_end)
     saldo = result["saldo_end"]
 
@@ -462,10 +463,11 @@ def close_month(partner_id):
     )
 
 
-# -------------------- НОВАЯ ПРОВОДКА --------------------
+# -------------------- NEUE BUCHUNG --------------------
 
 @app.route("/partner/<int:partner_id>/new_entry", methods=["GET", "POST"])
 def new_entry(partner_id):
+    """Erfassung einer neuen Buchung für einen Partner."""
     partner = Partner.query.get_or_404(partner_id)
     if not partner.accounts:
         flash("Kein Konto für diesen Partner vorhanden.", "error")
@@ -474,6 +476,7 @@ def new_entry(partner_id):
     account = partner.accounts[0]
 
     def render_form(state=None):
+        """Formular mit aktuellem Zustand rendern."""
         if state is None:
             state = {
                 "richtung": "AUS",
@@ -505,7 +508,7 @@ def new_entry(partner_id):
         "datum": datum_str or datetime.now().strftime("%Y-%m-%d"),
     }
 
-    # дата: пользовательская дата + текущее время
+    # Datum: vom Nutzer eingegebenes Datum + aktuelle Zeit
     try:
         user_date = datetime.strptime(state["datum"], "%Y-%m-%d").date()
         current_time = datetime.now().time()
@@ -514,7 +517,7 @@ def new_entry(partner_id):
         flash("Fehler! Datum ist ungültig.", "error")
         return render_form(state)
 
-    # нельзя писать в уже закрытый месяц
+    # Nicht in einen bereits abgeschlossenen Monat buchen
     last_close = (
         MonthClosure.query.filter_by(partner_id=partner.id)
         .order_by(MonthClosure.period_end.desc())
@@ -534,14 +537,14 @@ def new_entry(partner_id):
         flash("Fehler! Menge ist ungültig.", "error")
         return render_form(state)
 
-    # Richtung: только Eingang / Ausgang
+    # Richtung: nur Eingang / Ausgang
     mapping = {"EIN": "Eingang", "AUS": "Ausgang"}
     richtung_db = mapping.get((richtung_raw or "").upper())
     if richtung_db not in ("Eingang", "Ausgang"):
         flash("Fehler! Ungültige Richtung.", "error")
         return render_form(state)
 
-    # Ausgang → в комментарии должен быть номер (≥ 4 цифр), слово Ladeliste не обязательно
+    # Ausgang → im Kommentar muss eine Nummer (≥ 4 Ziffern) stehen
     if richtung_db == "Ausgang":
         if not re.search(r"\d{4,}", kommentar or ""):
             flash(
@@ -550,7 +553,7 @@ def new_entry(partner_id):
             )
             return render_form(state)
 
-    # распределяем Menge по видам
+    # Verteilung der Menge auf Lademitteltypen
     menge_eup = menge_gb = menge_tmb1 = menge_tmb2 = 0
     if typ == "EUP":
         menge_eup = menge
@@ -561,7 +564,7 @@ def new_entry(partner_id):
     elif typ == "TMB2":
         menge_tmb2 = menge
 
-    # Belegnummer / Konto-Nr (для новой обычной Buchung всегда KontoSeq=0)
+    # Belegnummer / Konto-Nr (für neue Standardbuchung immer KontoSeq = 0)
     today_str = datetime.now().strftime("%Y%m%d")
     count_today = (
         Entry.query.filter(Entry.belegnummer.like(f"{today_str}%")).count() + 1
@@ -589,10 +592,11 @@ def new_entry(partner_id):
     return redirect(url_for("partner_detail", partner_id=partner.id))
 
 
-# -------------------- KORREKTUR BUCHUNG --------------------
+# -------------------- KORREKTURBUCHUNG --------------------
 
 @app.route("/partner/<int:partner_id>/correction_entry", methods=["GET", "POST"])
 def correction_entry(partner_id):
+    """Erfassung einer Korrekturbuchung zu einer vorhandenen Belegnummer."""
     partner = Partner.query.get_or_404(partner_id)
     if not partner.accounts:
         flash("Kein Konto für diesen Partner vorhanden.", "error")
@@ -601,6 +605,7 @@ def correction_entry(partner_id):
     account = partner.accounts[0]
 
     def render_form(state=None):
+        """Formular für Korrekturbuchung rendern."""
         if state is None:
             state = {
                 "belegnummer": "",
@@ -640,7 +645,7 @@ def correction_entry(partner_id):
         flash("Fehler! Kommentar fehlt.", "error")
         return render_form(state)
 
-    # дата
+    # Datum
     try:
         user_date = datetime.strptime(state["datum"], "%Y-%m-%d").date()
         current_time = datetime.now().time()
@@ -649,7 +654,7 @@ def correction_entry(partner_id):
         flash("Fehler! Datum ist ungültig.", "error")
         return render_form(state)
 
-    # исходная Buchung (последняя Eingang/Ausgang по Belegnummer)
+    # Ursprüngliche Buchung (letzte Eingang/Ausgang mit dieser Belegnummer)
     original = (
         Entry.query.join(Account, Entry.account_id == Account.id)
         .filter(Account.partner_id == partner.id)
@@ -663,7 +668,7 @@ def correction_entry(partner_id):
         flash(f"Fehler! Belegnummer {belegnummer} nicht gefunden.", "error")
         return render_form(state)
 
-    # нельзя корректировать Buchung из уже закрытого месяца
+    # Keine Korrektur für Buchungen in einem bereits abgeschlossenen Monat
     last_close = (
         MonthClosure.query.filter_by(partner_id=partner.id)
         .order_by(MonthClosure.period_end.desc())
@@ -683,11 +688,11 @@ def correction_entry(partner_id):
         flash("Fehler! Menge ist ungültig.", "error")
         return render_form(state)
 
-    # знак для Korrektur: противоположный направлению исходной Buchung
+    # Vorzeichen für Korrektur: entgegengesetzt zur ursprünglichen Buchung
     if original.richtung == "Ausgang":
-        korr_menge = menge      # плюс
+        korr_menge = menge      # Plus
     else:  # Eingang
-        korr_menge = -menge     # минус
+        korr_menge = -menge     # Minus
 
     menge_eup = menge_gb = menge_tmb1 = menge_tmb2 = 0
     if typ == "EUP":
@@ -699,7 +704,7 @@ def correction_entry(partner_id):
     elif typ == "TMB2":
         menge_tmb2 = korr_menge
 
-    # новый Konto-Seq = последний по этому Belegnummer + 1
+    # Neuer Konto-Seq = letzter für diese Belegnummer + 1
     last_for_beleg = (
         Entry.query.join(Account, Entry.account_id == Account.id)
         .filter(Account.partner_id == partner.id)
@@ -733,6 +738,7 @@ def correction_entry(partner_id):
 
 @app.route("/partner/<int:partner_id>/export_excel")
 def export_excel(partner_id):
+    """Export der Buchungen in Excel für den gewählten Zeitraum."""
     start_date = parse_date_or_none(request.args.get("start_date"))
     end_date = parse_date_or_none(request.args.get("end_date"))
     richtung_filter = request.args.get("richtung") or "ALLE"
@@ -745,9 +751,6 @@ def export_excel(partner_id):
     result = calculate_saldo_and_sums(partner_id, start_date, end_date)
 
     entries = result["entries"]
-
-    # Storno полностью исключаем из выгрузки
-    entries = [e for e in entries if e.richtung != "Storno"]
 
     if richtung_filter in ("Eingang", "Ausgang", "Korrektur"):
         entries = [e for e in entries if e.richtung == richtung_filter]
@@ -800,10 +803,11 @@ def export_excel(partner_id):
     )
 
 
-# -------------------- PALETTENKONTO AUSZUG (Deckblatt + Anlage-Tabelle) --------------------
+# -------------------- PALETTENKONTO-AUSZUG (Deckblatt + Anlage) --------------------
 
 @app.route("/partner/<int:partner_id>/auszug_pdf")
 def export_auszug_pdf(partner_id):
+    """PDF-Auszug (Deckblatt + Anlagen-Tabelle) für einen Partner."""
     start_date = parse_date_or_none(request.args.get("start_date"))
     end_date = parse_date_or_none(request.args.get("end_date"))
 
@@ -814,14 +818,14 @@ def export_auszug_pdf(partner_id):
     partner = Partner.query.get_or_404(partner_id)
     result = calculate_saldo_and_sums(partner_id, start_date, end_date)
 
-    # --- Берём все записи (Eingang, Ausgang, Korrektur) ---
+    # Alle relevanten Buchungen (Eingang, Ausgang, Korrektur)
     entries = [
         e for e in result["entries"]
         if e.richtung in ("Eingang", "Ausgang", "Korrektur")
     ]
     entries.sort(key=lambda e: e.datum or datetime.min)
 
-    # --- Сальдо (общие суммы по всем тарам) ---
+    # Salden gesamt (Summe aus allen Lademitteln)
     def sum_dict(d):
         return (
             float(d.get("eup", 0) or 0) +
@@ -835,13 +839,13 @@ def export_auszug_pdf(partner_id):
     sum_eing_total    = sum_dict(result["sums_eingang"])
     sum_ausg_total    = sum_dict(result["sums_ausgang"])
 
-    # --- Период ---
+    # Zeitraum-Text
     if start_date.date() == end_date.date():
         period_str = start_date.strftime("%d.%m.%Y")
     else:
         period_str = f"{start_date.strftime('%d.%m.%Y')} – {end_date.strftime('%d.%m.%Y')}"
 
-    # --- PDF ---
+    # PDF erstellen
     buffer = io.BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
@@ -897,7 +901,7 @@ def export_auszug_pdf(partner_id):
 
     pdf.showPage()
 
-    # ======= ANLAGE – Tabelle wie Excel (mit Kommentar) =======
+    # ======= ANLAGE – Tabelle =======
     table_x = 40
     table_y = height - 60
     base_row_h = 15
@@ -907,7 +911,7 @@ def export_auszug_pdf(partner_id):
     pdf.drawString(table_x, table_y, "Anlage – Buchungsübersicht")
     table_y -= 20
 
-    # --- Колонки ---
+    # Spaltenkoordinaten
     col_date    = table_x + 4
     col_beleg   = table_x + 80
     col_konto   = table_x + 150
@@ -918,8 +922,8 @@ def export_auszug_pdf(partner_id):
     col_tmb2    = table_x + 395
     col_comment = table_x + 440
 
-    # --- Шапка таблицы ---
     def draw_header(y_pos):
+        """Tabellenkopf zeichnen."""
         pdf.setFillColorRGB(0.15, 0.32, 0.70)
         pdf.rect(table_x, y_pos, table_width, base_row_h, fill=1, stroke=1)
 
@@ -938,23 +942,23 @@ def export_auszug_pdf(partner_id):
 
         pdf.setFillColorRGB(0, 0, 0)
 
-    # нарисовать шапку
+    # Kopf einmal zeichnen
     draw_header(table_y)
     table_y -= base_row_h
     pdf.setFont("Helvetica", 8)
 
-    # --- Строки таблицы ---
+    # Tabellenzeilen
     for idx, e in enumerate(entries):
         full_comment = (e.kommentar or "").strip()
 
-        # перенос комментария до 3 строк
+        # Kommentar-Wrap (max. 3 Zeilen)
         comment_width = (table_x + table_width) - col_comment - 5
         wrapped_comment = simpleSplit(full_comment, "Helvetica", 8, comment_width)
         wrapped_comment = wrapped_comment[:3] if wrapped_comment else [""]
 
         needed_height = base_row_h * len(wrapped_comment)
 
-        # новая страница при нехватке места
+        # Neue Seite bei Platzmangel
         if table_y - needed_height < 50:
             pdf.showPage()
             table_y = height - 60
@@ -965,7 +969,7 @@ def export_auszug_pdf(partner_id):
             table_y -= base_row_h
             pdf.setFont("Helvetica", 8)
 
-        # зебра-фон
+        # Zebra-Hintergrund
         if idx % 2 == 0:
             pdf.setFillColorRGB(0.95, 0.97, 1.0)
         else:
@@ -982,7 +986,6 @@ def export_auszug_pdf(partner_id):
 
         pdf.setFillColorRGB(0, 0, 0)
 
-        # данные
         datum = e.datum.strftime("%d.%m.%Y %H:%M") if e.datum else ""
 
         pdf.drawString(col_date,  table_y + 3, datum)
@@ -995,16 +998,13 @@ def export_auszug_pdf(partner_id):
         pdf.drawRightString(col_tmb1 + 30, table_y + 3, f"{float(e.menge_tmb1 or 0):.2f}")
         pdf.drawRightString(col_tmb2 + 30, table_y + 3, f"{float(e.menge_tmb2 or 0):.2f}")
 
-        # комментарий построчно
         comment_y = table_y + 3
         for line in wrapped_comment:
             pdf.drawString(col_comment, comment_y, line)
             comment_y -= base_row_h
 
-        # сдвигаем "курсор" вниз на высоту блока
         table_y -= needed_height
 
-    # нижняя линия таблицы (на всякий случай)
     pdf.setStrokeColorRGB(0, 0, 0)
     pdf.line(table_x, table_y, table_x + table_width, table_y)
 
@@ -1020,10 +1020,12 @@ def export_auszug_pdf(partner_id):
         mimetype="application/pdf",
     )
 
-# -------------------- PALETTENSCHEIN ПО ОДНОЙ БУХУНГ --------------------
+
+# -------------------- PALETTENSCHEIN FÜR EINE BUCHUNG --------------------
 
 @app.route("/entry/<int:entry_id>/palettenschein")
 def palettenschein(entry_id):
+    """Erzeugt einen Palettenschein (PDF) für eine einzelne Buchung."""
     entry = Entry.query.get_or_404(entry_id)
     partner = entry.account.partner if entry.account else None
 
@@ -1103,7 +1105,7 @@ def palettenschein(entry_id):
     )
     y -= 40
 
-    # Подписи
+    # Unterschriften
     pdf.setFont("Helvetica", 10)
     pdf.drawString(x, y, "Unterschrift Partner:")
     pdf.line(x, y - 5, x + 200, y - 5)
@@ -1122,12 +1124,14 @@ def palettenschein(entry_id):
         download_name=filename,
         mimetype="application/pdf",
     )
+
+
 # -------------------- NEUER PARTNER --------------------
 
 @app.route("/partner/new", methods=["GET", "POST"])
 def new_partner():
     """
-    Anlage eines neuen Partners + automatisch ein leeres Konto.
+    Anlage eines neuen Partners + automatisches Anlegen eines leeren Kontos.
     """
     if request.method == "GET":
         return render_template("new_partner.html")
@@ -1180,11 +1184,12 @@ def delete_partner(partner_id):
     return redirect(url_for("index"))
 
 
-# -------------------- ЗАПУСК --------------------
+# -------------------- START --------------------
 
 if __name__ == "__main__":
-    # при первой инициализации можно временно включить:
+    # Für die erste Initialisierung kann man temporär aktivieren:
     # with app.app_context():
     #     db.create_all()
     app.run(debug=True)
+
 
