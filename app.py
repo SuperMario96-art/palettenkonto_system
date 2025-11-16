@@ -296,40 +296,55 @@ def partner_detail(partner_id):
     today = date.today()
     default_start, default_end = month_range(today)
 
-    # --------- Datum + Filterlogik ----------
-    start_date_param = parse_date_or_none(request.args.get("start_date"))
-    end_date_param   = parse_date_or_none(request.args.get("end_date"))
-
-    year_str = (request.args.get("year") or "").strip()
+    # ---- Parameter aus der URL ----
+    year_str  = (request.args.get("year") or "").strip()
     month_str = (request.args.get("month") or "").strip()
-    richtung_filter = request.args.get("richtung") or "ALLE"
 
-    # 1️⃣ Wenn Zeitraum manuell ausgewählt → diesen verwenden
-    if start_date_param and end_date_param:
-        start_date = start_date_param
-        end_date   = end_date_param
-        used_year  = start_date.year
-        used_month = start_date.month
+    start_date_raw = request.args.get("start_date")
+    end_date_raw   = request.args.get("end_date")
 
-    # 2️⃣ Wenn Jahr/Monat gewählt → Monatsansicht
-    elif year_str or month_str:
+    start_date_param = parse_date_or_none(start_date_raw)
+    end_date_param   = parse_date_or_none(end_date_raw)
+
+    richtung_filter    = request.args.get("richtung") or "ALLE"
+    belegnummer_filter = (request.args.get("belegnummer") or "").strip()
+
+    # ----------------------------------------------------
+    # 1️⃣ PRIORITÄT: WENN JAHR ODER MONAT AUSGEWÄHLT SIND
+    #    → Dann wird IMMER nach kompletten Kalendermonat gefiltert.
+    # ----------------------------------------------------
+    if year_str or month_str:
         try:
             used_year = int(year_str) if year_str else today.year
-        except:
+        except ValueError:
             used_year = today.year
 
         try:
-            used_month = int(month_str) if month_str else 1
-        except:
-            used_month = 1
+            used_month = int(month_str) if month_str else today.month
+        except ValueError:
+            used_month = today.month
 
+        # Ersten und letzten Tag des Monats berechnen
         start_date, end_date = month_range(date(used_year, used_month, 1))
 
-    # 3️⃣ Standard → aktueller Monat
+    # ----------------------------------------------------
+    # 2️⃣ MANUELLE ZEITSPANNE (nur wenn Jahr/Monat nicht gesetzt)
+    # ----------------------------------------------------
+    elif start_date_param and end_date_param:
+        # Zeitraum inklusiv: von 00:00 bis 23:59:59
+        start_date = start_date_param
+        end_date   = end_date_param + timedelta(days=1) - timedelta(seconds=1)
+
+        used_year  = start_date.year
+        used_month = start_date.month
+
+    # ----------------------------------------------------
+    # 3️⃣ STANDARD: aktueller Monat
+    # ----------------------------------------------------
     else:
         start_date = default_start
-        end_date = default_end
-        used_year = start_date.year
+        end_date   = default_end
+        used_year  = start_date.year
         used_month = start_date.month
 
     # ----- Berechnungen -----
@@ -340,32 +355,40 @@ def partner_detail(partner_id):
 
     entries = result["entries"]
 
-    # Richtung-Filter
+    # Filter: Richtung
     if richtung_filter in ("Eingang", "Ausgang", "Korrektur"):
         entries = [e for e in entries if e.richtung == richtung_filter]
 
-    # Summen für die Tabelle (wie Excel)
-    totals = {"eup": 0, "gb": 0, "tmb1": 0, "tmb2": 0}
-    for e in entries:
-        totals["eup"]  += float(e.menge_eup or 0)
-        totals["gb"]   += float(e.menge_gb or 0)
-        totals["tmb1"] += float(e.menge_tmb1 or 0)
-        totals["tmb2"] += float(e.menge_tmb2 or 0)
+    # Filter: Belegnummer
+    if belegnummer_filter:
+        entries = [
+            e for e in entries
+            if belegnummer_filter.lower() in (e.belegnummer or "").lower()
+        ]
 
-    for k in totals:
-        totals[k] = round(totals[k], 2)
+    # Summen berechnen
+    totals = {
+        "eup":  sum(float(e.menge_eup  or 0) for e in entries),
+        "gb":   sum(float(e.menge_gb   or 0) for e in entries),
+        "tmb1": sum(float(e.menge_tmb1 or 0) for e in entries),
+        "tmb2": sum(float(e.menge_tmb2 or 0) for e in entries),
+    }
+    totals = {k: round(v, 2) for k, v in totals.items()}
 
-    # Liste aller Jahre für Drop-down
+    # Liste aller verfügbaren Jahre für Dropdown
     all_entries = collect_partner_entries(partner)
     years_list = sorted({e.datum.year for e in all_entries if e.datum})
 
-    # Kann der Monat geschlossen werden?
+    # Monatsabschluss-Logik
     ms, me = month_range(start_date.date())
     is_full_month = (start_date == ms and end_date == me)
 
     first_of_current = date(today.year, today.month, 1)
+
     existing_closure = MonthClosure.query.filter_by(
-        partner_id=partner_id, year=start_date.year, month=start_date.month
+        partner_id=partner_id,
+        year=start_date.year,
+        month=start_date.month
     ).first()
 
     can_close_month = (
@@ -376,13 +399,14 @@ def partner_detail(partner_id):
 
     selected_month_closed = existing_closure is not None
 
-    # Schneller Zugriff: Vormonat
+    # Vorheriger Monat
     prev_ref = (ms - timedelta(days=1)).date()
     prev_month_start, prev_month_end = month_range(prev_ref)
 
     year_start = datetime(today.year, 1, 1)
     year_end   = datetime(today.year, 12, 31, 23, 59, 59)
 
+    # Übergabe an Template
     return render_template(
         "partner_detail.html",
         partner=partner,
@@ -399,6 +423,7 @@ def partner_detail(partner_id):
         selected_year=used_year,
         selected_month=used_month,
         richtung_filter=richtung_filter,
+        belegnummer_filter=belegnummer_filter,
         current_year=today.year,
         current_month=today.month,
         prev_year=prev_month_start.year,
@@ -410,6 +435,7 @@ def partner_detail(partner_id):
         close_month=start_date.month,
         selected_month_closed=selected_month_closed,
     )
+
 
 
 # -------------------- MONATSABSCHLUSS --------------------
@@ -747,6 +773,9 @@ def export_excel(partner_id):
         flash("Ungültiger Zeitraum für Export.", "error")
         return redirect(url_for("partner_detail", partner_id=partner_id))
 
+    # Zeitraum-Ende auf 23:59:59 setzen
+    end_date = end_date + timedelta(days=1) - timedelta(seconds=1)
+
     partner = Partner.query.get_or_404(partner_id)
     result = calculate_saldo_and_sums(partner_id, start_date, end_date)
 
@@ -815,6 +844,12 @@ def export_auszug_pdf(partner_id):
         flash("Ungültiger Zeitraum für Export.", "error")
         return redirect(url_for("partner_detail", partner_id=partner_id))
 
+    # Original-Enddatum für die Anzeige sichern
+    orig_end_date = end_date
+
+    # Enddatum auf 23:59:59 erweitern
+    end_date = end_date + timedelta(days=1) - timedelta(seconds=1)
+
     partner = Partner.query.get_or_404(partner_id)
     result = calculate_saldo_and_sums(partner_id, start_date, end_date)
 
@@ -823,7 +858,8 @@ def export_auszug_pdf(partner_id):
         e for e in result["entries"]
         if e.richtung in ("Eingang", "Ausgang", "Korrektur")
     ]
-    entries.sort(key=lambda e: e.datum or datetime.min)
+    # Neueste zuerst
+    entries.sort(key=lambda e: e.datum or datetime.min, reverse=True)
 
     # Salden gesamt (Summe aus allen Lademitteln)
     def sum_dict(d):
@@ -839,11 +875,16 @@ def export_auszug_pdf(partner_id):
     sum_eing_total    = sum_dict(result["sums_eingang"])
     sum_ausg_total    = sum_dict(result["sums_ausgang"])
 
-    # Zeitraum-Text
-    if start_date.date() == end_date.date():
+    # Zeitraum-Text korrekt darstellen
+    if start_date == orig_end_date:
+        # Ein einziger Tag
         period_str = start_date.strftime("%d.%m.%Y")
     else:
-        period_str = f"{start_date.strftime('%d.%m.%Y')} – {end_date.strftime('%d.%m.%Y')}"
+        # Mehrtägiger Zeitraum (am Deckblatt OHNE 23:59:59)
+        period_str = (
+            f"{start_date.strftime('%d.%m.%Y')} – "
+            f"{orig_end_date.strftime('%d.%m.%Y')}"
+        )
 
     # PDF erstellen
     buffer = io.BytesIO()
